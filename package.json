@@ -1,0 +1,39 @@
+{
+  "name": "biconomy-meta-tx-poc",
+  "version": "1.0.0",
+  "description": "A friendly project to demo how to configure and use biconomy's relayer for gasless meta transactions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deployFarm:test": "HARDHAT_NETWORK=mumbai npx hardhat run scripts/deploy-farm.js",
+    "start": "npx http-server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ashwinYardi/biconomy-meta-tx-poc.git"
+  },
+  "keywords": [
+    "Biconomy",
+    "Meta",
+    "transactions",
+    "ethereum",
+    "solidity"
+  ],
+  "author": "Ashwin Yardi",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ashwinYardi/biconomy-meta-tx-poc/issues"
+  },
+  "homepage": "https://github.com/ashwinYardi/biconomy-meta-tx-poc#readme",
+  "devDependencies": {
+    "@nomiclabs/hardhat-etherscan": "^2.1.8",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/contracts": "3.4.0",
+    "hardhat": "^2.8.0",
+    "solidity-coverage": "^0.7.17"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "http-server": "^14.0.0"
+  }
+}

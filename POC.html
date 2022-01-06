@@ -1,0 +1,984 @@
+<head>
+  Sample Biconomy Gasless Executer
+</head>
+<body>
+  <h1>
+    Hello This is a demo script for biconomy gasless contract execution POC.
+  </h1>
+  <h3>
+    Sit back and relax. You don't need to do anything. Script is already running
+    its magic in the background. Watch out for any metamask signature prompts.
+  </h3>
+</body>
+<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@biconomy/mexa@latest/dist/mexa.js"></script>
+<script>
+  // global vars
+  targetContract = "0x4Cb1f46a657013194c94f72f4376DB20E64A583E";
+  targetContractAbi = [
+    {
+      inputs: [
+        { internalType: "contract IERC20", name: "_cnt", type: "address" },
+        { internalType: "uint256", name: "_cntPerBlock", type: "uint256" },
+        { internalType: "address", name: "_feeAddress", type: "address" },
+        { internalType: "uint256", name: "_startBlock", type: "uint256" },
+        {
+          internalType: "uint256",
+          name: "_bonusEndBlock",
+          type: "uint256",
+        },
+      ],
+      stateMutability: "nonpayable",
+      type: "constructor",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "_blockRate",
+          type: "uint256",
+        },
+      ],
+      name: "BlockRateUpdated",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "_bonusMultiplier",
+          type: "uint256",
+        },
+      ],
+      name: "BonusMultiplierUpdated",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "address",
+          name: "user",
+          type: "address",
+        },
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "amount",
+          type: "uint256",
+        },
+      ],
+      name: "Deposit",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "address",
+          name: "user",
+          type: "address",
+        },
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "amount",
+          type: "uint256",
+        },
+      ],
+      name: "EmergencyWithdraw",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: false,
+          internalType: "address",
+          name: "userAddress",
+          type: "address",
+        },
+        {
+          indexed: false,
+          internalType: "address payable",
+          name: "relayerAddress",
+          type: "address",
+        },
+        {
+          indexed: false,
+          internalType: "bytes",
+          name: "functionSignature",
+          type: "bytes",
+        },
+      ],
+      name: "MetaTransactionExecuted",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "address",
+          name: "previousOwner",
+          type: "address",
+        },
+        {
+          indexed: true,
+          internalType: "address",
+          name: "newOwner",
+          type: "address",
+        },
+      ],
+      name: "OwnershipTransferred",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "allocPoint",
+          type: "uint256",
+        },
+        {
+          indexed: true,
+          internalType: "contract IERC20",
+          name: "lpToken",
+          type: "address",
+        },
+        {
+          indexed: false,
+          internalType: "uint16",
+          name: "withdrawalFeeBP",
+          type: "uint16",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "harvestInterval",
+          type: "uint256",
+        },
+      ],
+      name: "PoolAddition",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "lastRewardBlock",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "lpSupply",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "accCNTPerShare",
+          type: "uint256",
+        },
+      ],
+      name: "PoolUpdated",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "address",
+          name: "user",
+          type: "address",
+        },
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "amountLockedUp",
+          type: "uint256",
+        },
+      ],
+      name: "RewardLockedUp",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "address",
+          name: "user",
+          type: "address",
+        },
+        {
+          indexed: true,
+          internalType: "address",
+          name: "_devAddress",
+          type: "address",
+        },
+      ],
+      name: "SetFeeAddress",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "allocPoint",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint16",
+          name: "withdrawalFeeBP",
+          type: "uint16",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "harvestInterval",
+          type: "uint256",
+        },
+      ],
+      name: "UpdatedPoolAlloc",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: false,
+          internalType: "address",
+          name: "_primaryUser",
+          type: "address",
+        },
+        {
+          indexed: false,
+          internalType: "address",
+          name: "_blacklistedUser",
+          type: "address",
+        },
+      ],
+      name: "UserBlacklisted",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: false,
+          internalType: "address",
+          name: "_primaryUser",
+          type: "address",
+        },
+        {
+          indexed: false,
+          internalType: "address",
+          name: "_whitelistedUser",
+          type: "address",
+        },
+      ],
+      name: "UserWhitelisted",
+      type: "event",
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: "address",
+          name: "user",
+          type: "address",
+        },
+        {
+          indexed: true,
+          internalType: "uint256",
+          name: "pid",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          internalType: "uint256",
+          name: "amount",
+          type: "uint256",
+        },
+      ],
+      name: "Withdraw",
+      type: "event",
+    },
+    {
+      inputs: [],
+      name: "BONUS_MULTIPLIER",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "ERC712_VERSION",
+      outputs: [{ internalType: "string", name: "", type: "string" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "MAXIMUM_HARVEST_INTERVAL",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "MAXIMUM_WITHDRAWAL_FEE_BP",
+      outputs: [{ internalType: "uint16", name: "", type: "uint16" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "address", name: "", type: "address" }],
+      name: "activeLpTokens",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_allocPoint", type: "uint256" },
+        {
+          internalType: "contract IERC20",
+          name: "_lpToken",
+          type: "address",
+        },
+        {
+          internalType: "uint16",
+          name: "_withdrawalFeeBP",
+          type: "uint16",
+        },
+        {
+          internalType: "uint256",
+          name: "_harvestInterval",
+          type: "uint256",
+        },
+        { internalType: "bool", name: "_withUpdate", type: "bool" },
+      ],
+      name: "add",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "address", name: "_user", type: "address" }],
+      name: "addUserToWhiteList",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "bonusEndBlock",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "address", name: "_user", type: "address" },
+      ],
+      name: "canHarvest",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "cnt",
+      outputs: [{ internalType: "contract IERC20", name: "", type: "address" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "cntPerBlock",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_amount", type: "uint256" },
+      ],
+      name: "deposit",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_amount", type: "uint256" },
+        { internalType: "address", name: "_user", type: "address" },
+      ],
+      name: "depositFor",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_amount", type: "uint256" },
+        { internalType: "address", name: "_user", type: "address" },
+        { internalType: "uint256", name: "_deadline", type: "uint256" },
+        { internalType: "uint8", name: "_v", type: "uint8" },
+        { internalType: "bytes32", name: "_r", type: "bytes32" },
+        { internalType: "bytes32", name: "_s", type: "bytes32" },
+      ],
+      name: "depositForWithPermit",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_amount", type: "uint256" },
+        { internalType: "uint256", name: "_deadline", type: "uint256" },
+        { internalType: "uint8", name: "_v", type: "uint8" },
+        { internalType: "bytes32", name: "_r", type: "bytes32" },
+        { internalType: "bytes32", name: "_s", type: "bytes32" },
+      ],
+      name: "depositWithPermit",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "uint256", name: "_pid", type: "uint256" }],
+      name: "emergencyWithdraw",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "address", name: "userAddress", type: "address" },
+        { internalType: "bytes", name: "functionSignature", type: "bytes" },
+        { internalType: "bytes32", name: "sigR", type: "bytes32" },
+        { internalType: "bytes32", name: "sigS", type: "bytes32" },
+        { internalType: "uint8", name: "sigV", type: "uint8" },
+      ],
+      name: "executeMetaTransaction",
+      outputs: [{ internalType: "bytes", name: "", type: "bytes" }],
+      stateMutability: "payable",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "feeAddress",
+      outputs: [{ internalType: "address", name: "", type: "address" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "getChainId",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "pure",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "getDomainSeperator",
+      outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "address", name: "_user", type: "address" },
+      ],
+      name: "getHarvestUntil",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_from", type: "uint256" },
+        { internalType: "uint256", name: "_to", type: "uint256" },
+      ],
+      name: "getMultiplier",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "address", name: "user", type: "address" }],
+      name: "getNonce",
+      outputs: [{ internalType: "uint256", name: "nonce", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "isRewardManagerEnabled",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "address", name: "_owner", type: "address" },
+        { internalType: "address", name: "_user", type: "address" },
+      ],
+      name: "isUserWhiteListed",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "massUpdatePools",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "owner",
+      outputs: [{ internalType: "address", name: "", type: "address" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "address", name: "_user", type: "address" },
+      ],
+      name: "pendingCNT",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      name: "poolInfo",
+      outputs: [
+        {
+          internalType: "contract IERC20",
+          name: "lpToken",
+          type: "address",
+        },
+        { internalType: "uint256", name: "allocPoint", type: "uint256" },
+        {
+          internalType: "uint256",
+          name: "lastRewardBlock",
+          type: "uint256",
+        },
+        {
+          internalType: "uint256",
+          name: "accCNTPerShare",
+          type: "uint256",
+        },
+        { internalType: "uint16", name: "withdrawalFeeBP", type: "uint16" },
+        {
+          internalType: "uint256",
+          name: "harvestInterval",
+          type: "uint256",
+        },
+      ],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "poolLength",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "address", name: "_user", type: "address" }],
+      name: "removeUserFromWhiteList",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "renounceOwnership",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "rewardManager",
+      outputs: [{ internalType: "address", name: "", type: "address" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_allocPoint", type: "uint256" },
+        {
+          internalType: "uint16",
+          name: "_withdrawalFeeBP",
+          type: "uint16",
+        },
+        {
+          internalType: "uint256",
+          name: "_harvestInterval",
+          type: "uint256",
+        },
+        { internalType: "bool", name: "_withUpdate", type: "bool" },
+      ],
+      name: "set",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "address", name: "_feeAddress", type: "address" },
+      ],
+      name: "setFeeAddress",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "startBlock",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "totalAllocPoint",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [],
+      name: "totalLockedUpRewards",
+      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "address", name: "newOwner", type: "address" }],
+      name: "transferOwnership",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_cntPerBlock", type: "uint256" },
+      ],
+      name: "updateBlockRate",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        {
+          internalType: "uint256",
+          name: "multiplierNumber",
+          type: "uint256",
+        },
+      ],
+      name: "updateBonusMultiplier",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "uint256", name: "_pid", type: "uint256" }],
+      name: "updatePool",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        {
+          internalType: "address",
+          name: "_rewardManager",
+          type: "address",
+        },
+      ],
+      name: "updateRewardManager",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        {
+          internalType: "bool",
+          name: "_isRewardManagerEnabled",
+          type: "bool",
+        },
+      ],
+      name: "updateRewardManagerMode",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "", type: "uint256" },
+        { internalType: "address", name: "", type: "address" },
+      ],
+      name: "userInfo",
+      outputs: [
+        { internalType: "uint256", name: "amount", type: "uint256" },
+        { internalType: "uint256", name: "rewardDebt", type: "uint256" },
+        {
+          internalType: "uint256",
+          name: "rewardLockedUp",
+          type: "uint256",
+        },
+        {
+          internalType: "uint256",
+          name: "nextHarvestUntil",
+          type: "uint256",
+        },
+      ],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "address", name: "", type: "address" },
+        { internalType: "address", name: "", type: "address" },
+      ],
+      name: "whiteListedHandlers",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_amount", type: "uint256" },
+      ],
+      name: "withdraw",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [{ internalType: "uint256", name: "_amount", type: "uint256" }],
+      name: "withdrawCNT",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+    {
+      inputs: [
+        { internalType: "uint256", name: "_pid", type: "uint256" },
+        { internalType: "uint256", name: "_amount", type: "uint256" },
+        { internalType: "address", name: "_user", type: "address" },
+      ],
+      name: "withdrawFor",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+  ];
+  
+  
+  // Root function
+  function main() {
+    // Init instances
+    Biconomy = window.Biconomy;
+    Web3 = window.Web3;
+
+    // Create Biconomy provider
+    biconomy = new Biconomy(
+      new Web3.providers.HttpProvider("https://rpc-mumbai.maticvigil.com/"),
+      {
+        apiKey: `oho4Lv0pb.9695d7ab-b1a4-41d4-b89b-367e1d6f0550`,
+        debug: true,
+      }
+    );
+    web3 = new Web3(biconomy);
+
+    // Conenct to Client Wallet
+    window.ethereum.enable();
+    userAddress = window.ethereum.selectedAddress;
+    walletWeb3 = new Web3(window.ethereum);
+    networkId = window.ethereum.networkVersion;
+
+    biconomy.onEvent(biconomy.READY, () => {
+      initConstants();
+      generateAndSendPayload();
+    });
+  }
+
+  function initConstants() {
+    console.log("Initialising Constants.......");
+    // Initialize constants
+    domainType = [
+      { name: "name", type: "string" },
+      { name: "version", type: "string" },
+      { name: "verifyingContract", type: "address" },
+      { name: "chainId", type: "uint256" },
+    ];
+    metaTransactionType = [
+      { name: "nonce", type: "uint256" },
+      { name: "from", type: "address" },
+      { name: "functionSignature", type: "bytes" },
+    ];
+    // replace the chainId 42 if network is not kovan
+    domainData = {
+      name: "Farm",
+      version: "1",
+      verifyingContract: targetContract,
+      // converts Number to bytes32. pass your chainId instead of 42 if network is not Kovan
+      chainId: parseInt(networkId),
+    };
+
+    contract = new web3.eth.Contract(targetContractAbi, targetContract);
+  }
+
+  function generateAndSendPayload() {
+    contract.methods
+      .getNonce(userAddress)
+      .call()
+      .then(function (nonce) {
+        console.log("Preparing EIP712 typed Data.......");
+        // Create your target method signature.. here we are calling setQuote() method of our contract
+        functionSignature = contract.methods.deposit(0, 0).encodeABI();
+        message = {};
+        message.nonce = parseInt(nonce);
+        message.from = userAddress;
+        message.functionSignature = functionSignature;
+
+        dataToSign = JSON.stringify({
+          types: {
+            EIP712Domain: domainType,
+            MetaTransaction: metaTransactionType,
+          },
+          domain: domainData,
+          primaryType: "MetaTransaction",
+          message: message,
+        });
+
+        console.log(dataToSign);
+
+        signAndSendTypedData();
+      });
+  }
+
+  function signAndSendTypedData() {
+    console.log("Signing Typed Data.......");
+    walletWeb3.currentProvider.sendAsync(
+      {
+        jsonrpc: "2.0",
+        id: 999999999999,
+        method: "eth_signTypedData_v4",
+        params: [userAddress, dataToSign],
+      },
+      function (error, response) {
+        console.log("Sending Meta Transactions.......");
+        signature = response.result.substring(2);
+        r = "0x" + signature.substring(0, 64);
+        s = "0x" + signature.substring(64, 128);
+        v = parseInt(signature.substring(128, 130), 16);
+        console.log(r, "r");
+        console.log(s, "s");
+        console.log(v, "v");
+        console.log(userAddress, "userAddress");
+
+        tx = contract.methods
+          .executeMetaTransaction(userAddress, functionSignature, r, s, v)
+          .send({
+            from: userAddress,
+            gasPrice: "30000000000",
+            gas: "1720460",
+          });
+
+        tx.on("transactionHash", function (hash) {
+          console.log(
+            "Meta transaction successful. Congrats! Here is transaction hash: "
+          );
+          console.log(hash);
+        })
+          .once("confirmation", function (confirmationNumber, receipt) {
+            console.log(
+              "Meta transaction confirmed. Congrats! You are a true champ!"
+            );
+          })
+          .on("error", function (error) {
+            console.log(
+              "No worries mate, thigns go wrong sometimes. Here is what went wrong: "
+            );
+            console.log(error);
+          });
+      }
+    );
+  }
+  window.addEventListener("load", main);
+</script>
